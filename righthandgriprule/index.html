@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Right Hand Grip Rule Practice</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f6fb;
+    color: #222;
+  }
+
+  header {
+    background: #1e4fa3;
+    color: #fff;
+    padding: 10px 16px;
+    text-align: center;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  header p {
+    margin: 3px 0 0;
+    font-size: 13px;
+  }
+
+  main {
+    max-width: 900px;
+    margin: 16px auto;
+    padding: 12px;
+  }
+
+  .top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .mode-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .mode-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid #1e4fa3;
+    background: #fff;
+    color: #1e4fa3;
+    cursor: pointer;
+  }
+
+  .mode-btn.active {
+    background: #1e4fa3;
+    color: #fff;
+  }
+
+  .scoreboard {
+    font-size: 13px;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    margin-bottom: 12px;
+  }
+
+  .card h2 {
+    margin-top: 0;
+    font-size: 16px;
+  }
+
+  .diagram-box {
+    background: #f0f3ff;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .question-text {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .options {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 8px;
+  }
+
+  .option-btn {
+    padding: 8px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    background: #fafafa;
+    text-align: left;
+  }
+
+  .option-btn:hover {
+    background: #eef2ff;
+  }
+
+  .option-btn.correct {
+    border-color: #1c8c3a;
+    background: #e4f7ea;
+  }
+
+  .option-btn.incorrect {
+    border-color: #c0392b;
+    background: #fde9e7;
+  }
+
+  .feedback {
+    margin-top: 10px;
+    font-size: 13px;
+    min-height: 40px;
+  }
+
+  .feedback p {
+    margin: 4px 0;
+  }
+
+  .feedback-steps {
+    font-size: 12px;
+    color: #333;
+  }
+
+  .highlight {
+    font-weight: 600;
+    color: #1e4fa3;
+  }
+
+  .control-bar {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  button#next-question {
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: none;
+    background: #1e4fa3;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  button#next-question:hover {
+    background: #163b78;
+  }
+
+  .tiny-note {
+    font-size: 11px;
+    color: #555;
+  }
+
+  .legend {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .legend span {
+    display: inline-block;
+    margin-right: 10px;
+  }
+
+  .legend code {
+    font-family: "Courier New", monospace;
+  }
+
+  @media (max-width: 600px) {
+    header h1 {
+      font-size: 18px;
+    }
+    main {
+      margin: 8px;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Right Hand Grip Rule Practice</h1>
+  <p>Practise the relationship between current direction and magnetic field for wires, coils, and solenoids.</p>
+</header>
+
+<main>
+  <div class="top-bar">
+    <div class="mode-select">
+      <button class="mode-btn active" data-mode="mixed">Mixed</button>
+      <button class="mode-btn" data-mode="straight">Straight Wire</button>
+      <button class="mode-btn" data-mode="coil">Flat Circular Coil</button>
+      <button class="mode-btn" data-mode="solenoid">Solenoid</button>
+    </div>
+    <div class="scoreboard">
+      Score: <span id="score">0</span> /
+      <span id="total">0</span>
+    </div>
+  </div>
+
+  <section class="card" id="question-card">
+    <h2 id="question-title">Question</h2>
+    <div class="diagram-box" id="diagram">
+      <!-- ASCII diagram goes here -->
+    </div>
+    <div class="legend">
+      <span><code>•</code> current or field coming <strong>out</strong> of the page</span>
+      <span><code>×</code> current or field going <strong>into</strong> the page</span>
+    </div>
+    <p class="question-text" id="question-text"></p>
+
+    <div class="options" id="options">
+      <!-- Option buttons -->
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <div class="control-bar">
+      <button id="next-question">Next Question</button>
+      <div class="tiny-note">
+        Hint: Use your <span class="highlight">right hand</span>, follow <span class="highlight">conventional current</span>.
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>How to use the Right Hand Grip Rule</h2>
+    <p style="font-size:13px;margin-top:4px;">
+      1. Grip the wire or coil with your <span class="highlight">right hand</span>.<br>
+      2. Point your <span class="highlight">thumb</span> in the direction of the <strong>conventional current</strong> (from + to −).<br>
+      3. The direction in which your <span class="highlight">fingers curl</span> shows the direction of the <strong>magnetic field lines</strong>.
+    </p>
+    <p style="font-size:12px;">
+      For a solenoid: fingers follow the current around the coils, thumb points to the <strong>North pole</strong> of the solenoid.
+    </p>
+  </section>
+</main>
+
+<script>
+/*
+  Simple practice game for:
+  - Straight wire
+  - Flat circular coil
+  - Solenoid
+*/
+
+const modeButtons = document.querySelectorAll('.mode-btn');
+const scoreSpan = document.getElementById('score');
+const totalSpan = document.getElementById('total');
+const questionTitle = document.getElementById('question-title');
+const diagramBox = document.getElementById('diagram');
+const questionText = document.getElementById('question-text');
+const optionsDiv = document.getElementById('options');
+const feedbackDiv = document.getElementById('feedback');
+const nextBtn = document.getElementById('next-question');
+
+let currentMode = 'mixed';
+let score = 0;
+let total = 0;
+let currentQuestion = null;
+let answered = false;
+
+// Question bank
+// Each question: {type, title, diagram, text, options, answerIndex, explanation, ruleSteps}
+const questions = [
+  // STRAIGHT WIRE
+  {
+    type: 'straight',
+    title: 'Straight wire: current upward',
+    diagram:
+`       ↑  current (up)
+       |
+       |
+      (•) out of page (left side)
+       |
+      (×) into page (right side)`,
+    text: 'A long vertical wire carries conventional current upward. On the LEFT side of the wire, what is the direction of the magnetic field?',
+    options: [
+      'Out of the page (•)',
+      'Into the page (×)',
+      'Upward along the wire',
+      'Downward along the wire'
+    ],
+    answerIndex: 0,
+    explanation:
+      'Grip the wire with your right hand so that your thumb points upward (current direction). Your fingers curl out of the page on the left side and into the page on the right side.',
+    ruleSteps: [
+      'Step 1: Use your right hand, not your left.',
+      'Step 2: Point your thumb in the direction of conventional current (upward).',
+      'Step 3: See how your fingers curl around the wire; on the left side they point out of the page.'
+    ]
+  },
+  {
+    type: 'straight',
+    title: 'Straight wire: current out of page',
+    diagram:
+`           • current (out of page)
+
+       (anticlockwise field)
+
+        ↑
+   ←         →
+        ↓`,
+    text: 'A vertical wire is viewed end-on. The current comes out of the page (•). What is the direction of the magnetic field at a point directly ABOVE the wire?',
+    options: [
+      'To the left',
+      'To the right',
+      'Into the page (×)',
+      'Out of the page (•)'
+    ],
+    answerIndex: 1,
+    explanation:
+      'Grip the wire with your right hand so your thumb points out of the page (towards you). Your fingers curl anticlockwise. At the top of the wire, your fingers point to the right.',
+    ruleSteps: [
+      'Step 1: Point your right thumb out of the page (•) to match the current.',
+      'Step 2: Notice that your fingers curl anticlockwise around the wire.',
+      'Step 3: At the top, your fingers point to the right, so the field is to the right.'
+    ]
+  },
+  {
+    type: 'straight',
+    title: 'Straight wire: current into page',
+    diagram:
+`           × current (into page)
+
+       (clockwise field)
+
+        ↑
+   ←         →
+        ↓`,
+    text: 'A vertical wire is viewed end-on. The current goes into the page (×). What is the direction of the magnetic field at a point directly ABOVE the wire?',
+    options: [
+      'To the left',
+      'To the right',
+      'Out of the page (•)',
+      'Into the page (×)'
+    ],
+    answerIndex: 0,
+    explanation:
+      'Grip the wire with your right hand so your thumb points into the page. Your fingers curl clockwise. At the top of the wire, your fingers point to the left.',
+    ruleSteps: [
+      'Step 1: Point your right thumb into the page (×).',
+      'Step 2: Your fingers curl clockwise around the wire.',
+      'Step 3: At the top, your fingers point to the left, so the field is to the left.'
+    ]
+  },
+
+  // FLAT COIL
+  {
+    type: 'coil',
+    title: 'Flat circular coil: anticlockwise current',
+    diagram:
+`View from front:
+
+   current direction around coil:
+       ↺ (anticlockwise)
+
+   at centre: B field is out of page (•)`,
+    text: 'A flat circular coil lies in the page. When viewed from the front, the current flows anticlockwise. What is the direction of the magnetic field at the centre of the coil?',
+    options: [
+      'Out of the page (•)',
+      'Into the page (×)',
+      'Upwards in the plane of the page',
+      'Downwards in the plane of the page'
+    ],
+    answerIndex: 0,
+    explanation:
+      'Grip the coil with your right hand so that your fingers follow the direction of the conventional current around the coil (anticlockwise). Your thumb then points out of the page, which is the direction of the magnetic field at the centre.',
+    ruleSteps: [
+      'Step 1: Use your right hand and make your fingers follow the anticlockwise current.',
+      'Step 2: Make sure you follow conventional current, not electron flow.',
+      'Step 3: Your thumb now points out of the page, which is the magnetic field direction at the centre.'
+    ]
+  },
+  {
+    type: 'coil',
+    title: 'Flat circular coil: clockwise current',
+    diagram:
+`View from front:
+
+   current direction around coil:
+       ↻ (clockwise)
+
+   at centre: B field is into page (×)`,
+    text: 'A flat circular coil lies in the page. When viewed from the front, the current flows clockwise. What is the direction of the magnetic field at the centre of the coil?',
+    options: [
+      'Out of the page (•)',
+      'Into the page (×)',
+      'Upwards in the plane of the page',
+      'Downwards in the plane of the page'
+    ],
+    answerIndex: 1,
+    explanation:
+      'Grip the coil with your right hand with your fingers following the clockwise conventional current. Your thumb then points into the page, so the magnetic field at the centre is into the page.',
+    ruleSteps: [
+      'Step 1: Place your right hand so fingers follow the clockwise current.',
+      'Step 2: Confirm you are using the right hand, not the left.',
+      'Step 3: Your thumb points into the page, so the field is into the page.'
+    ]
+  },
+
+  // SOLENOID
+  {
+    type: 'solenoid',
+    title: 'Solenoid: find North pole',
+    diagram:
+`Side view of solenoid:
+
+   left end             right end
+  ( ? )  ############  ( ? )
+
+   current seen on top is left → right`,
+    text: 'A long solenoid is horizontal. When viewed from above, the conventional current flows from left to right along the top. Using the right hand grip rule, which end is the North pole?',
+    options: [
+      'Left end is North, right end is South',
+      'Right end is North, left end is South',
+      'Both ends are North',
+      'Both ends are South'
+    ],
+    answerIndex: 1,
+    explanation:
+      'Grip the solenoid with your right hand so your fingers follow the conventional current around the coils. Your thumb points towards the North pole. With current on the top going left to right, your thumb points to the right, so the right end is the North pole.',
+    ruleSteps: [
+      'Step 1: Wrap your right hand around the solenoid so fingers follow the current direction around the turns.',
+      'Step 2: Ensure your fingers on the top go left to right, matching the given current.',
+      'Step 3: Your thumb now points to the right, showing the North pole is at the right end.'
+    ]
+  },
+  {
+    type: 'solenoid',
+    title: 'Solenoid: field inside',
+    diagram:
+`Solenoid (side view):
+
+    N  >>>>>>>>>  S
+
+ B field inside goes from N to S`,
+    text: 'Inside a long solenoid, the magnetic field lines run from the South pole to the North pole or from the North pole to the South pole?',
+    options: [
+      'From North to South inside the solenoid',
+      'From South to North inside the solenoid',
+      'There is no field inside',
+      'It depends on current size only'
+    ],
+    answerIndex: 0,
+    explanation:
+      'For a solenoid, by convention, the magnetic field lines inside run from the North pole to the South pole. The right hand grip rule helps you identify which end is North; once that is known, the field inside goes from N to S.',
+    ruleSteps: [
+      'Step 1: Use the right hand grip rule to find which end is North.',
+      'Step 2: Remember the convention: inside a solenoid, field lines go from N to S.',
+      'Step 3: Outside, field lines return from S back to N, forming closed loops.'
+    ]
+  }
+];
+
+// Utility: filter questions by mode
+function getQuestionsForMode(mode) {
+  if (mode === 'mixed') return questions;
+  return questions.filter(q => q.type === mode);
+}
+
+function pickRandomQuestion() {
+  const qs = getQuestionsForMode(currentMode);
+  const index = Math.floor(Math.random() * qs.length);
+  return qs[index];
+}
+
+function loadQuestion() {
+  currentQuestion = pickRandomQuestion();
+  answered = false;
+
+  questionTitle.textContent = currentQuestion.title;
+  diagramBox.textContent = currentQuestion.diagram;
+  questionText.textContent = currentQuestion.text;
+
+  // Clear options & feedback
+  optionsDiv.innerHTML = '';
+  feedbackDiv.innerHTML = '';
+
+  currentQuestion.options.forEach((opt, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.textContent = (idx + 1) + '. ' + opt;
+    btn.addEventListener('click', () => handleAnswer(idx, btn));
+    optionsDiv.appendChild(btn);
+  });
+}
+
+function handleAnswer(choiceIndex, btn) {
+  if (answered) return;
+  answered = true;
+
+  total++;
+  totalSpan.textContent = total;
+
+  const optionButtons = optionsDiv.querySelectorAll('.option-btn');
+  const correctIndex = currentQuestion.answerIndex;
+
+  optionButtons.forEach((b, idx) => {
+    if (idx === correctIndex) {
+      b.classList.add('correct');
+    }
+    if (idx === choiceIndex && idx !== correctIndex) {
+      b.classList.add('incorrect');
+    }
+    b.disabled = true;
+  });
+
+  if (choiceIndex === correctIndex) {
+    score++;
+    scoreSpan.textContent = score;
+    showFeedback(true);
+  } else {
+    showFeedback(false, choiceIndex);
+  }
+}
+
+function showFeedback(isCorrect, chosenIndex) {
+  const commonMistakes = [];
+
+  // Simple misconception hints
+  if (!isCorrect) {
+    if (currentQuestion.type === 'straight') {
+      commonMistakes.push('Common mistake: using the left hand instead of the right.');
+      commonMistakes.push('Common mistake: confusing the field direction with the current direction along the wire.');
+    } else if (currentQuestion.type === 'coil') {
+      commonMistakes.push('Common mistake: following electron flow instead of conventional current.');
+      commonMistakes.push('Common mistake: forgetting that your thumb gives the field direction at the centre.');
+    } else if (currentQuestion.type === 'solenoid') {
+      commonMistakes.push('Common mistake: reversing the North and South ends.');
+      commonMistakes.push('Common mistake: thinking field lines inside go from S to N.');
+    }
+  }
+
+  const resultText = isCorrect
+    ? '<p><strong>Correct!</strong></p>'
+    : '<p><strong>Not quite.</strong> Review the right hand grip rule.</p>';
+
+  const explanationText = `<p>${currentQuestion.explanation}</p>`;
+
+  const stepsList = currentQuestion.ruleSteps
+    .map(step => '• ' + step)
+    .join('<br>');
+
+  let mistakesText = '';
+  if (commonMistakes.length > 0) {
+    mistakesText = '<p><span class="highlight">Watch out:</span><br>' +
+      commonMistakes.join('<br>') + '</p>';
+  }
+
+  feedbackDiv.innerHTML =
+    resultText +
+    explanationText +
+    `<div class="feedback-steps">${stepsList}</div>` +
+    mistakesText;
+}
+
+// Mode switching
+modeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    modeButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    loadQuestion();
+  });
+});
+
+// Next question
+nextBtn.addEventListener('click', () => {
+  loadQuestion();
+});
+
+// Initialise
+loadQuestion();
+</script>
+</body>
+</html>
