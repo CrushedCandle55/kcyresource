@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Directory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: [
+                            '-apple-system',
+                            'BlinkMacSystemFont',
+                            '"SF Pro Display"',
+                            '"SF Pro Text"',
+                            '"Helvetica Neue"',
+                            'Helvetica',
+                            'Arial',
+                            'sans-serif'
+                        ],
+                        mono: [
+                            '"SF Mono"',
+                            'ui-monospace',
+                            'Menlo',
+                            'Monaco',
+                            'Consolas',
+                            'monospace'
+                        ]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            letter-spacing: -0.011em;
+        }
+
+        /* Apple Glass & Card Styling */
+        .apple-card {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .apple-card:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.22);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Animated Arrow Icon */
+        .apple-card:hover .chevron-icon {
+            transform: translateX(4px);
+            color: #ffffff;
+        }
+
+        .chevron-icon {
+            transition: transform 0.25s ease, color 0.25s ease;
+        }
+
+        /* Subtle scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-[#000000] text-[#f5f5f7] min-h-screen font-sans selection:bg-white selection:text-black">
+
+    <!-- Navbar -->
+    <header class="sticky top-0 z-50 backdrop-blur-2xl bg-[#000000]/75 border-b border-white/10">
+        <div class="max-w-6xl mx-auto px-5 md:px-8 py-4 flex flex-row items-center justify-between gap-4">
+            
+            <!-- Site Title -->
+            <a href="#" class="text-lg md:text-xl font-semibold tracking-tight hover:opacity-80 transition-opacity shrink-0">
+                Resource Portal
+            </a>
+
+            <!-- Search Bar -->
+            <div class="relative w-48 sm:w-64 md:w-80">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search resources..." 
+                    class="w-full bg-white/5 border border-white/10 rounded-full px-4 py-1.5 pl-9 text-xs sm:text-sm focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all placeholder-zinc-500 text-white"
+                >
+                <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-6xl mx-auto px-5 md:px-8 py-8 md:py-12">
+        
+        <!-- Header -->
+        <div class="mb-8 md:mb-10">
+            <h1 class="text-3xl md:text-5xl font-bold tracking-tight mb-2">Resource</h1>
+            <p class="text-sm md:text-base text-zinc-400 font-normal">Direct link directory for web applications and interactive modules.</p>
+        </div>
+
+        <!-- Project Cards Grid -->
+        <div id="cardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+            <!-- Dynamic Cards Rendered via JS -->
+        </div>
+
+        <!-- Empty Search State -->
+        <div id="noResults" class="hidden text-center py-20">
+            <p class="text-lg text-zinc-500 font-light">No matching resources found.</p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-6xl mx-auto px-5 md:px-8 py-8 border-t border-white/10 text-xs text-zinc-500 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <p>© Directory Portal. All rights reserved.</p>
+        <p class="font-mono text-[10px] uppercase tracking-wider text-zinc-600">Apple Minimal Monolithic</p>
+    </footer>
+
+    <script>
+        // Exact directory dataset with specified titles, dates, descriptions, and paths
+        const projects = [
+            { 
+                name: "10schallenge", 
+                updated: "Built on Oct 24, 2026", 
+                description: "No description",
+                href: "./10schallenge/"
+            },
+            { 
+                name: "righthandgriprule", 
+                updated: "Built on May 28, 2026", 
+                description: "No description",
+                href: "./righthandgriprule/"
+            },
+            { 
+                name: "S2eyedefect", 
+                updated: "Built on Apr 21, 2026", 
+                description: "No description",
+                href: "./S2eyedefect/"
+            },
+            { 
+                name: "FBIdirection", 
+                updated: "Built on Apr 20, 2026", 
+                description: "No description",
+                href: "./FBIdirection/"
+            },
+            { 
+                name: "particlemodel", 
+                updated: "Built on Apr 20, 2026", 
+                description: "No description",
+                href: "./particlemodel/"
+            },
+            { 
+                name: "lightcone", 
+                updated: "Built on Apr 20, 2026", 
+                description: "No description",
+                href: "./lightcone/"
+            },
+            { 
+                name: "big2", 
+                updated: "Built on Feb 21, 2026", 
+                description: "No description",
+                href: "./big2/"
+            },
+            { 
+                name: "circuitbuilder", 
+                updated: "Built on Feb 02, 2026", 
+                description: "No description",
+                href: "./circuitbuilder/"
+            },
+            { 
+                name: "S2acidsalkalis", 
+                updated: "Built on Dec 18, 2025", 
+                description: "Online Revision Exercise for S2 Chapter 9 (2025-26)",
+                href: "./S2acidsalkalis/"
+            },
+            { 
+                name: "lightmeterapp", 
+                updated: "Built on Dec 17, 2025", 
+                description: "No description",
+                href: "./lightmeterapp/"
+            },
+            { 
+                name: "projectilemotion", 
+                updated: "Built on Dec 16, 2025", 
+                description: "No description",
+                href: "./projectilemotion/"
+            }
+        ];
+
+        const cardsContainer = document.getElementById('cardsContainer');
+        const searchInput = document.getElementById('searchInput');
+        const noResults = document.getElementById('noResults');
+
+        // Render Cards Function
+        function renderProjects(items) {
+            cardsContainer.innerHTML = '';
+
+            if (items.length === 0) {
+                noResults.classList.remove('hidden');
+                return;
+            } else {
+                noResults.classList.add('hidden');
+            }
+
+            items.forEach(project => {
+                const card = document.createElement('a');
+                card.href = project.href;
+                card.className = 'apple-card group p-5 rounded-2xl flex flex-col justify-between min-h-[150px] cursor-pointer';
+
+                const isCustomDescription = project.description !== "No description";
+                const descClass = isCustomDescription 
+                    ? "text-zinc-300 font-normal text-xs leading-relaxed" 
+                    : "text-zinc-600 font-normal text-xs italic";
+
+                card.innerHTML = `
+                    <div>
+                        <!-- Title & Arrow -->
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <h2 class="text-base sm:text-lg font-semibold tracking-tight text-white group-hover:text-white transition-colors break-all">
+                                ${project.name}
+                            </h2>
+                            <span class="chevron-icon text-zinc-500 text-sm shrink-0 mt-0.5">
+                                &#x279C;
+                            </span>
+                        </div>
+
+                        <!-- Description -->
+                        <p class="${descClass} line-clamp-2">
+                            ${project.description}
+                        </p>
+                    </div>
+
+                    <!-- Date Metadata Footer -->
+                    <div class="pt-3 mt-4 border-t border-white/5 flex items-center justify-between text-[11px] text-zinc-500">
+                        <span class="font-medium">${project.updated}</span>
+                    </div>
+                `;
+
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        // Search Input Event Listener
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const filtered = projects.filter(p => 
+                p.name.toLowerCase().includes(query) || 
+                p.description.toLowerCase().includes(query) ||
+                p.updated.toLowerCase().includes(query)
+            );
+            renderProjects(filtered);
+        });
+
+        // Initialize display
+        renderProjects(projects);
+    </script>
+</body>
+</html>
