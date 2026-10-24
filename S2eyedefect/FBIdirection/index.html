@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Magnetic Force Direction Game</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+  min-height:100vh;
+  padding:16px;
+}
+h1{font-size:24px;color:#f8fafc;margin-bottom:6px;}
+.sub{color:#94a3b8;font-size:13px;margin-bottom:14px;line-height:1.5;}
+
+.layout{display:grid;grid-template-columns:300px 1fr;gap:14px;}
+@media(max-width:800px){.layout{grid-template-columns:1fr;}}
+
+.card{
+  background:#111827;
+  border:1px solid #1e293b;
+  border-radius:14px;
+  padding:14px;
+}
+
+/* Controls */
+.ctrl{display:flex;gap:8px;margin-bottom:12px;}
+button{
+  font:inherit;cursor:pointer;
+  border:none;border-radius:10px;
+  padding:10px 18px;color:#fff;
+  background:#2563eb;transition:filter .15s;
+}
+button:hover{filter:brightness(1.15);}
+button.sec{background:#374151;}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.st{background:#1f2937;border:1px solid #273449;border-radius:10px;padding:10px 12px;}
+.st-l{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+.st-v{font-size:22px;font-weight:700;}
+
+/* Question */
+.qbox{
+  background:#0b1220;border:1px solid #1e293b;
+  border-radius:10px;padding:12px;
+  font-size:14px;line-height:1.6;
+  margin-bottom:12px;min-height:56px;
+}
+
+/* Choices */
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.ch{
+  background:#1f2937;border:1px solid #334155;
+  border-radius:12px;padding:12px 8px;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:4px;min-height:70px;color:#f8fafc;
+  cursor:pointer;transition:background .13s,transform .13s;
+}
+.ch:hover:not([disabled]){background:#273449;transform:translateY(-2px);}
+.ch[disabled]{opacity:.3;cursor:not-allowed;}
+.ch .s{font-size:28px;font-weight:900;}
+.ch .n{font-size:11px;color:#94a3b8;text-align:center;}
+
+/* Status */
+.status{
+  border-radius:10px;padding:10px 12px;
+  background:#0b1220;border:1px solid #1e293b;
+  font-size:13px;min-height:40px;margin-bottom:12px;
+}
+.status.ok{border-color:rgba(34,197,94,.5);color:#bbf7d0;}
+.status.err{border-color:rgba(239,68,68,.5);color:#fecaca;}
+
+/* Legend */
+.legend{display:grid;gap:6px;margin-bottom:10px;}
+.leg{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 10px;background:#0b1220;
+  border:1px solid #1e293b;border-radius:8px;font-size:13px;
+}
+.dot{width:11px;height:11px;border-radius:50%;}
+
+/* Canvas panel */
+.canvas-wrap{position:relative;}
+canvas{display:block;width:100%;height:auto;border-radius:12px;border:1px solid #1e293b;}
+
+/* Feedback overlay */
+#fbOverlay{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:12px;pointer-events:none;
+  opacity:0;transition:opacity .15s;
+}
+#fbOverlay.show{opacity:1;}
+#fbMark{
+  font-size:160px;font-weight:900;line-height:1;
+  animation:pop .2s cubic-bezier(.3,1.5,.5,1) both;
+}
+.fb-ok #fbMark{color:#22c55e;filter:drop-shadow(0 0 30px #22c55e);}
+.fb-err #fbMark{color:#ef4444;filter:drop-shadow(0 0 30px #ef4444);}
+@keyframes pop{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* Summary overlay */
+#summaryOverlay{
+  display:none;position:fixed;inset:0;z-index:999;
+  background:rgba(2,6,23,.93);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+}
+#summaryOverlay.show{display:flex;}
+.sum{
+  background:#111827;border:1px solid #1e293b;
+  border-radius:20px;padding:36px 44px;
+  max-width:440px;width:90%;text-align:center;
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+}
+.sum h2{font-size:26px;color:#f8fafc;margin-bottom:4px;}
+.sum p{color:#94a3b8;font-size:13px;margin-bottom:16px;}
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.ss{background:#1f2937;border:1px solid #273449;border-radius:12px;padding:14px 10px;}
+.ss-l{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.ss-v{font-size:26px;font-weight:700;}
+.bar-bg{background:#0b1220;border-radius:999px;height:8px;margin-bottom:18px;overflow:hidden;}
+.bar-fg{height:100%;border-radius:999px;background:linear-gradient(90deg,#22c55e,#38bdf8);width:0%;transition:width .6s ease;}
+</style>
+</head>
+<body>
+
+<div id="summaryOverlay">
+  <div class="sum">
+    <div style="font-size:60px;margin-bottom:8px;">🏆</div>
+    <h2>Game Complete!</h2>
+    <p>You completed 5 correct rounds!</p>
+    <div class="bar-bg"><div class="bar-fg" id="barFg"></div></div>
+    <div class="sum-grid">
+      <div class="ss"><div class="ss-l">Time</div><div class="ss-v" id="sTime">—</div></div>
+      <div class="ss"><div class="ss-l">Attempts</div><div class="ss-v" id="sAttempts">—</div></div>
+      <div class="ss"><div class="ss-l">Accuracy</div><div class="ss-v" id="sAccuracy">—</div></div>
+      <div class="ss"><div class="ss-l">Wrong</div><div class="ss-v" id="sWrong">—</div></div>
+    </div>
+    <button id="playAgainBtn" style="padding:13px 30px;font-size:15px;">▶ Play Again</button>
+  </div>
+</div>
+
+<h1>⚡ Magnetic Force Direction Game</h1>
+<p class="sub">
+  Two of three vectors (F, B, I) are shown. Choose the missing direction using <strong>F = IL × B</strong>.
+  Complete <strong>5 correct rounds</strong> as fast as you can!
+</p>
+
+<div class="layout">
+  <!-- LEFT -->
+  <div class="card">
+    <div class="ctrl">
+      <button id="startBtn">▶ Start</button>
+      <button id="resetBtn" class="sec">↺ Reset</button>
+    </div>
+
+    <div class="stats">
+      <div class="st"><div class="st-l">Round</div><div class="st-v" id="dRound">0/5</div></div>
+      <div class="st"><div class="st-l">Time</div><div class="st-v" id="dTime">00:00.0</div></div>
+      <div class="st"><div class="st-l">Correct</div><div class="st-v" id="dCorrect">0</div></div>
+      <div class="st"><div class="st-l">Attempts</div><div class="st-v" id="dAttempts">0</div></div>
+    </div>
+
+    <div class="qbox" id="qbox">Press <strong>▶ Start</strong> to begin.</div>
+
+    <div class="choices" id="choicesDiv"></div>
+
+    <div class="status" id="statusDiv">Ready.</div>
+
+    <div class="legend">
+      <div class="leg"><span class="dot" style="background:#f59e0b;"></span>F — force on wire</div>
+      <div class="leg"><span class="dot" style="background:#06b6d4;"></span>B — magnetic field</div>
+      <div class="leg"><span class="dot" style="background:#a78bfa;"></span>I — conventional current</div>
+    </div>
+    <p style="color:#64748b;font-size:12px;margin-top:8px;">
+      <span style="background:#082f49;border:1px solid #0c4a6e;border-radius:999px;padding:2px 8px;color:#bae6fd;margin-right:4px;">⊙ out of page</span>
+      <span style="background:#082f49;border:1px solid #0c4a6e;border-radius:999px;padding:2px 8px;color:#bae6fd;">⊗ into page</span>
+    </p>
+  </div>
+
+  <!-- RIGHT: canvas -->
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div class="canvas-wrap">
+      <canvas id="myCanvas" width="820" height="520"></canvas>
+      <div id="fbOverlay">
+        <span id="fbMark"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+  // ── Direction data ──────────────────────────────────────────────────────
+  var DIRS = [
+    { key:"PX", name:"Right",       short:"+x", sym:"→", vec:[1,0,0]  },
+    { key:"NX", name:"Left",        short:"-x", sym:"←", vec:[-1,0,0] },
+    { key:"PY", name:"Up",          short:"+y", sym:"↑", vec:[0,1,0]  },
+    { key:"NY", name:"Down",        short:"-y", sym:"↓", vec:[0,-1,0] },
+    { key:"PZ", name:"Out of page", short:"+z", sym:"⊙", vec:[0,0,1]  },
+    { key:"NZ", name:"Into page",   short:"-z", sym:"⊗", vec:[0,0,-1] }
+  ];
+  var COLORS = { F:"#f59e0b", B:"#06b6d4", I:"#a78bfa" };
+  var LABELS = { F:"Force (F)", B:"Magnetic field (B)", I:"Current (I)" };
+  var WIN = 5;
+
+  // ── Canvas setup ────────────────────────────────────────────────────────
+  var canvas = document.getElementById("myCanvas");
+  var ctx    = canvas.getContext("2d");
+  var CW = canvas.width;   // 820
+  var CH = canvas.height;  // 520
+  var OX = CW * 0.5;       // origin x = 410
+  var OY = CH * 0.56;      // origin y = 291
+  var ALEN = 130;           // arrow length
+
+  // ── DOM refs ────────────────────────────────────────────────────────────
+  var startBtn      = document.getElementById("startBtn");
+  var resetBtn      = document.getElementById("resetBtn");
+  var qbox          = document.getElementById("qbox");
+  var choicesDiv    = document.getElementById("choicesDiv");
+  var statusDiv     = document.getElementById("statusDiv");
+  var dRound        = document.getElementById("dRound");
+  var dTime         = document.getElementById("dTime");
+  var dCorrect      = document.getElementById("dCorrect");
+  var dAttempts     = document.getElementById("dAttempts");
+  var fbOverlay     = document.getElementById("fbOverlay");
+  var fbMark        = document.getElementById("fbMark");
+  var summaryOverlay= document.getElementById("summaryOverlay");
+  var barFg         = document.getElementById("barFg");
+  var sTime         = document.getElementById("sTime");
+  var sAttempts     = document.getElementById("sAttempts");
+  var sAccuracy     = document.getElementById("sAccuracy");
+  var sWrong        = document.getElementById("sWrong");
+  var playAgainBtn  = document.getElementById("playAgainBtn");
+
+  // ── Game state ──────────────────────────────────────────────────────────
+  var round=0, correct=0, attempts=0, wrongCount=0;
+  var gameActive=false, locked=false;
+  var timerID=null, startTime=0, elapsed=0;
+  var Q=null;
+
+  // ── Build choice buttons (once) ─────────────────────────────────────────
+  DIRS.forEach(function(d) {
+    var btn = document.createElement("button");
+    btn.className = "ch";
+    btn.setAttribute("data-key", d.key);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="s">'+d.sym+'</span><span class="n">'+d.name+'<br><small>'+d.short+'</small></span>';
+    btn.addEventListener("click", function() {
+      handleAnswer(d.key);
+    });
+    choicesDiv.appendChild(btn);
+  });
+
+  // ── Event listeners ─────────────────────────────────────────────────────
+  startBtn.addEventListener("click", function() {
+    startGame();
+  });
+  resetBtn.addEventListener("click", function() {
+    resetGame();
+  });
+  playAgainBtn.addEventListener("click", function() {
+    summaryOverlay.classList.remove("show");
+    resetGame();
+  });
+
+  // ── Initial draw ────────────────────────────────────────────────────────
+  drawIdle();
+
+  // ── GAME FUNCTIONS ───────────────────────────────────────────────────────
+
+  function startGame() {
+    round = 1; correct = 0; attempts = 0; wrongCount = 0;
+    gameActive = true; locked = false; elapsed = 0;
+    startTime = Date.now();
+    summaryOverlay.classList.remove("show");
+    clearFeedback();
+    updateStats();
+    setStatus("Game started! Choose the missing direction.", "");
+    stopTimer();
+    timerID = setInterval(function() {
+      if (!gameActive) return;
+      elapsed = Date.now() - startTime;
+      dTime.textContent = fmtTime(elapsed);
+    }, 100);
+    nextQuestion();
+  }
+
+  function resetGame() {
+    stopTimer();
+    gameActive = false; locked = false; elapsed = 0;
+    round = 0; correct = 0; attempts = 0; wrongCount = 0; Q = null;
+    dTime.textContent = "00:00.0";
+    updateStats();
+    qbox.innerHTML = "Press <strong>▶ Start</strong> to begin.";
+    setStatus("Ready.", "");
+    clearFeedback();
+    disableAllChoices();
+    drawIdle();
+  }
+
+  function nextQuestion() {
+    Q = makeQuestion();
+    locked = false;
+    enableAllChoices();
+    clearFeedback();
+    qbox.innerHTML = "Round <strong>"+round+"</strong>/"+WIN+
+      " &nbsp;— Find the direction of <strong>"+LABELS[Q.unknown]+"</strong>.";
+    updateStats();
+    drawScene();
+  }
+
+  function handleAnswer(key) {
+    if (!gameActive || locked || !Q) return;
+    locked = true;
+    disableAllChoices();
+    attempts++;
+
+    if (key === Q.answerKey) {
+      correct++;
+      showFeedback(true);
+      setStatus("✓ Correct! "+LABELS[Q.unknown]+" is "+getDirByKey(key).name+".", "ok");
+      round++;
+      updateStats();
+      setTimeout(function() {
+        clearFeedback();
+        if (correct >= WIN) {
+          endGame();
+        } else {
+          nextQuestion();
+        }
+      }, 1000);
+    } else {
+      wrongCount++;
+      showFeedback(false);
+      setStatus("✗ Wrong answer. New question for the same round.", "err");
+      updateStats();
+      setTimeout(function() {
+        clearFeedback();
+        nextQuestion();
+      }, 1000);
+    }
+  }
+
+  function endGame() {
+    gameActive = false;
+    locked = true;
+    stopTimer();
+    var acc = Math.round(WIN / Math.max(attempts, WIN) * 100);
+    sTime.textContent     = fmtTime(elapsed);
+    sAttempts.textContent = String(attempts);
+    sAccuracy.textContent = acc + "%";
+    sWrong.textContent    = String(wrongCount);
+    summaryOverlay.classList.add("show");
+    setTimeout(function() { barFg.style.width = acc + "%"; }, 150);
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function stopTimer() {
+    if (timerID) { clearInterval(timerID); timerID = null; }
+  }
+
+  function updateStats() {
+    dRound.textContent    = Math.min(round, WIN) + "/" + WIN;
+    dCorrect.textContent  = String(correct);
+    dAttempts.textContent = String(attempts);
+  }
+
+  function setStatus(text, cls) {
+    statusDiv.textContent = text;
+    statusDiv.className   = "status" + (cls ? " "+cls : "");
+  }
+
+  function showFeedback(ok) {
+    fbMark.textContent = ok ? "✓" : "✗";
+    fbOverlay.className = ok ? "show fb-ok" : "show fb-err";
+  }
+
+  function clearFeedback() {
+    fbOverlay.className = "";
+    fbMark.textContent  = "";
+  }
+
+  function enableAllChoices() {
+    var btns = choicesDiv.querySelectorAll("button");
+    for (var i=0; i<btns.length; i++) btns[i].disabled = false;
+  }
+
+  function disableAllChoices() {
+    var btns = choicesDiv.querySelectorAll("button");
+    for (var i=0; i<btns.length; i++) btns[i].disabled = true;
+  }
+
+  function getDirByKey(k) {
+    for (var i=0; i<DIRS.length; i++) if (DIRS[i].key===k) return DIRS[i];
+    return null;
+  }
+
+  function fmtTime(ms) {
+    var t = Math.floor(ms/100);
+    var m = Math.floor(t/600);
+    var s = Math.floor((t%600)/10);
+    var f = t%10;
+    return pad2(m)+":"+pad2(s)+"."+f;
+  }
+  function pad2(n) { return n<10?"0"+n:String(n); }
+
+  // ── Question generation ──────────────────────────────────────────────────
+
+  function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+  function cross(a,b) {
+    return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  }
+  function vecEq(a,b) { return a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2]; }
+  function randFrom(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+  function makeQuestion() {
+    var I = randFrom(DIRS);
+    var Blist = [];
+    for (var i=0; i<DIRS.length; i++) {
+      if (dot(DIRS[i].vec, I.vec) === 0) Blist.push(DIRS[i]);
+    }
+    var B = randFrom(Blist);
+    var Fvec = cross(I.vec, B.vec);
+    var F = null;
+    for (var j=0; j<DIRS.length; j++) {
+      if (vecEq(DIRS[j].vec, Fvec)) { F=DIRS[j]; break; }
+    }
+    var unknownList = ["F","B","I"];
+    var unknown = randFrom(unknownList);
+    var map = { F:F, B:B, I:I };
+    var shown = [];
+    for (var k=0; k<unknownList.length; k++) {
+      if (unknownList[k]!==unknown) shown.push(unknownList[k]);
+    }
+    return {
+      F: F, B: B, I: I,
+      unknown: unknown,
+      shown: shown,
+      answerKey: map[unknown].key
+    };
+  }
+
+  // ── Drawing ──────────────────────────────────────────────────────────────
+
+  function drawIdle() {
+    clearCanvas();
+    drawGrid();
+    drawAxes();
+    drawOriginDot();
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("Press ▶ Start to begin", 22, 36);
+    drawInfoBox(["F = IL × B", "⊙ = out of page", "⊗ = into page"]);
+  }
+
+  function drawScene() {
+    if (!Q) { drawIdle(); return; }
+    clearCanvas();
+    drawGrid();
+    drawAxes();
+    // Draw known quantities
+    for (var i=0; i<Q.shown.length; i++) {
+      var k = Q.shown[i];
+      drawQuantity(Q[k], COLORS[k], k);
+    }
+    drawOriginDot();
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("Find direction of: "+LABELS[Q.unknown], 22, 36);
+    drawInfoBox([
+      "Known: "+Q.shown.map(function(k){return LABELS[k];}).join(" & "),
+      "Missing: "+LABELS[Q.unknown]
+    ]);
+  }
+
+  function drawQuantity(dir, color, label) {
+    if (dir.key==="PZ" || dir.key==="NZ") {
+      drawPageSymbol(dir.key==="PZ", color, label);
+    } else {
+      var ex = OX + dir.vec[0]*ALEN;
+      var ey = OY - dir.vec[1]*ALEN;
+      drawArrow(OX, OY, ex, ey, color, label);
+    }
+  }
+
+  function drawPageSymbol(outOfPage, color, label) {
+    var r = 36;
+    ctx.save();
+    ctx.shadowColor = color; ctx.shadowBlur = 22;
+    ctx.strokeStyle = color; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(OX, OY, r, 0, Math.PI*2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (outOfPage) {
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(OX, OY, 11, 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.strokeStyle = color; ctx.lineWidth = 5; ctx.lineCap = "round";
+      var o = 16;
+      ctx.beginPath(); ctx.moveTo(OX-o,OY-o); ctx.lineTo(OX+o,OY+o); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(OX+o,OY-o); ctx.lineTo(OX-o,OY+o); ctx.stroke();
+    }
+    // Fixed label offsets per quantity to avoid overlap
+    var offsets = { F:[58,-58], B:[-92,-58], I:[58,70] };
+    var off = offsets[label] || [55,-55];
+    ctx.fillStyle = color; ctx.font = "bold 22px Arial";
+    ctx.fillText(label, OX+off[0], OY+off[1]);
+    ctx.restore();
+  }
+
+  function drawArrow(x1,y1,x2,y2,color,label) {
+    var ang = Math.atan2(y2-y1, x2-x1);
+    var h = 18;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2-h*Math.cos(ang-Math.PI/7), y2-h*Math.sin(ang-Math.PI/7));
+    ctx.lineTo(x2-h*Math.cos(ang+Math.PI/7), y2-h*Math.sin(ang+Math.PI/7));
+    ctx.closePath(); ctx.fill();
+    ctx.font = "bold 22px Arial"; ctx.fillStyle = color;
+    ctx.fillText(label, x2+14, y2-14);
+    ctx.restore();
+  }
+
+  function clearCanvas() {
+    var g = ctx.createLinearGradient(0,0,0,CH);
+    g.addColorStop(0,"#0f172a"); g.addColorStop(1,"#020617");
+    ctx.fillStyle = g; ctx.fillRect(0,0,CW,CH);
+  }
+
+  function drawGrid() {
+    ctx.save(); ctx.strokeStyle="rgba(148,163,184,.08)"; ctx.lineWidth=1;
+    for (var i=-8; i<=8; i++) {
+      ctx.beginPath(); ctx.moveTo(0,OY+i*38); ctx.lineTo(CW,OY+i*38); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(OX+i*55,0); ctx.lineTo(OX+i*55,CH); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawAxes() {
+    var ext = ALEN+55;
+    ctx.save();
+    ctx.strokeStyle="rgba(148,163,184,.32)"; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(OX-ext,OY); ctx.lineTo(OX+ext,OY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(OX,OY-ext); ctx.lineTo(OX,OY+ext); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle="#64748b"; ctx.font="15px Arial";
+    ctx.fillText("+x",OX+ext-20,OY-8);
+    ctx.fillText("-x",OX-ext+4, OY-8);
+    ctx.fillText("+y",OX+8,     OY-ext+18);
+    ctx.fillText("-y",OX+8,     OY+ext-6);
+    ctx.restore();
+  }
+
+  function drawOriginDot() {
+    ctx.beginPath(); ctx.arc(OX,OY,5,0,Math.PI*2);
+    ctx.fillStyle="#e2e8f0"; ctx.fill();
+  }
+
+  function drawInfoBox(lines) {
+    var x=CW-220, y=12, w=206, h=26+lines.length*22;
+    ctx.save();
+    ctx.fillStyle="rgba(11,18,32,.9)";
+    ctx.strokeStyle="#243244"; ctx.lineWidth=1.2;
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,h,10);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#94a3b8"; ctx.font="14px Arial";
+    for (var i=0;i<lines.length;i++) ctx.fillText(lines[i],x+12,y+24+i*21);
+    ctx.restore();
+  }
+
+}); // end DOMContentLoaded
+</script>
+</body>
+</html>
