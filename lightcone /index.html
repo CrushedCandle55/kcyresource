@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Light Cone & Eyeball – Physics Simulation</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #0f1117;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+  #ui-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    background: #181c27;
+    border-bottom: 1px solid #2a2f3e;
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 16px;
+    z-index: 100;
+  }
+  #ui-bar .logo { font-size: 14px; font-weight: 600; color: #4f98a3; letter-spacing: .03em; }
+  #ui-bar .hint { font-size: 12px; color: #7a8399; margin-left: auto; }
+  #canvas-wrap { position: fixed; top: 48px; left: 0; right: 0; bottom: 0; }
+  canvas { width: 100%; height: 100%; display: block; cursor: default; }
+</style>
+</head>
+<body>
+<div id="ui-bar">
+  <span class="logo">🔭 Light Cone &amp; Eyeball Simulation</span>
+  <span class="hint">Drag objects · Drag θ label · Pinch / scroll to zoom</span>
+</div>
+<div id="canvas-wrap"><canvas id="sim"></canvas></div>
+
+<script>
+const canvas = document.getElementById('sim');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  W = canvas.width  = wrap.clientWidth  * devicePixelRatio;
+  H = canvas.height = wrap.clientHeight * devicePixelRatio;
+  canvas.style.width  = wrap.clientWidth  + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  draw();
+}
+window.addEventListener('resize', resize);
+
+const EYE_OVAL_RX    = 14;
+const EYE_OVAL_RY    = 22;
+const OVAL_OFFSET_X  = 30;
+const CURVE_SPAN_X   = 80;
+const CURVE_SPREAD_Y = 36;
+const PUPIL_HALF     = 18;
+const LABEL_FS       = 15; // shared font size (world-scaled)
+
+let state = {
+  eye:    { x: -150, y: 0 },
+  object: { x:  88,  y: 0 },
+  panX: 0, panY: 0,
+  scale: 1.5,
+  thetaOffset: { x: -40, y: 28 },
+};
+
+function w2s(wx, wy) {
+  return [W/2 + state.panX + wx * state.scale,
+          H/2 + state.panY - wy * state.scale];
+}
+function s2w(sx, sy) {
+  return [(sx - W/2 - state.panX) / state.scale,
+          -(sy - H/2 - state.panY) / state.scale];
+}
+
+function getPupilEdges(ex, ey) {
+  return [
+    { x: ex, y: ey + PUPIL_HALF },
+    { x: ex, y: ey - PUPIL_HALF },
+  ];
+}
+
+function coneAngle(ex, ey, ox, oy) {
+  const [e0, e1] = getPupilEdges(ex, ey);
+  const v1 = { x: ox - e0.x, y: oy - e0.y };
+  const v2 = { x: ox - e1.x, y: oy - e1.y };
+  const dot = v1.x * v2.x + v1.y * v2.y;
+  const cos = Math.min(1, Math.max(-1, dot / (Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y))));
+  return Math.acos(cos) * 180 / Math.PI;
+}
+
+// Ray-ellipse intersection — returns t in [0,1] or null
+function rayEllipseIntersect(px, py, qx, qy, cx, cy, rx, ry) {
+  const dx = qx - px, dy = qy - py;
+  const fx = px - cx, fy = py - cy;
+  const a = (dx*dx)/(rx*rx) + (dy*dy)/(ry*ry);
+  const b = 2*((fx*dx)/(rx*rx) + (fy*dy)/(ry*ry));
+  const c = (fx*fx)/(rx*rx) + (fy*fy)/(ry*ry) - 1;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return null;
+  const sqrtD = Math.sqrt(disc);
+  const t1 = (-b - sqrtD) / (2*a);
+  const t2 = (-b + sqrtD) / (2*a);
+  let t = null;
+  if (t1 >= 0 && t1 <= 1) t = t1;
+  if (t2 >= 0 && t2 <= 1 && (t === null || t2 < t)) t = t2;
+  return t;
+}
+
+// Returns the world-coord endpoint where the ray hits the oval (or pupil edge if no hit)
+function rayEndpoint(ox, oy, ex, ey, ovalCx, ovalCy) {
+  const t = rayEllipseIntersect(ox, oy, ex, ey, ovalCx, ovalCy, EYE_OVAL_RX, EYE_OVAL_RY);
+  if (t !== null) {
+    return { x: ox + t*(ex-ox), y: oy + t*(ey-oy) };
+  }
+  return { x: ex, y: ey };
+}
+
+function drawEyeSymbol(ex, ey, highlighted) {
+  const [cx, cy] = w2s(ex, ey);
+  const sc = state.scale;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(sc, sc);
+
+  const ox = OVAL_OFFSET_X;
+  const rx = EYE_OVAL_RX;
+  const ry = EYE_OVAL_RY;
+  const endX       = ox - rx * 0.55;
+  const endTopY    = -ry * 0.85;
+  const endBottomY =  ry * 0.85;
+  const uc1x = CURVE_SPAN_X*0.35, uc1y = -CURVE_SPREAD_Y*1.1;
+  const uc2x = CURVE_SPAN_X*0.65, uc2y = -CURVE_SPREAD_Y*0.7;
+  const lc1x = CURVE_SPAN_X*0.35, lc1y =  CURVE_SPREAD_Y*0.9;
+  const lc2x = CURVE_SPAN_X*0.60, lc2y =  CURVE_SPREAD_Y*0.5;
+  const lineCol = highlighted ? '#f59e42' : '#d0dce8';
+
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(uc1x, uc1y, uc2x, uc2y, endX, endTopY);
+  ctx.strokeStyle = lineCol; ctx.lineWidth = 1.8; ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(lc1x, lc1y, lc2x, lc2y, endX, endBottomY);
+  ctx.strokeStyle = lineCol; ctx.lineWidth = 1.8; ctx.stroke();
+
+  ctx.beginPath();
+  ctx.ellipse(ox, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#0a0d14'; ctx.fill();
+  ctx.strokeStyle = lineCol; ctx.lineWidth = 1.8; ctx.stroke();
+
+  // Eye label — same LABEL_FS as theta
+  const fs = Math.max(13, LABEL_FS * sc);
+  ctx.font = `bold ${fs / sc}px 'Segoe UI', sans-serif`;
+  ctx.fillStyle = '#ffe066';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Eye', ox / 2, -CURVE_SPREAD_Y - 8);
+
+  if (highlighted) {
+    ctx.beginPath();
+    ctx.arc(ox/2, 0, CURVE_SPREAD_Y*1.35, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(245,158,66,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function drawObject(ox, oy, highlighted) {
+  const [sx, sy] = w2s(ox, oy);
+  const r = 9 * state.scale;
+  ctx.save();
+  ctx.translate(sx, sy);
+  const grd = ctx.createRadialGradient(0,0,0, 0,0, r*4);
+  grd.addColorStop(0, 'rgba(255,224,102,0.5)');
+  grd.addColorStop(1, 'rgba(255,224,102,0)');
+  ctx.beginPath(); ctx.arc(0,0, r*4, 0, Math.PI*2);
+  ctx.fillStyle = grd; ctx.fill();
+  ctx.beginPath(); ctx.arc(0,0, r, 0, Math.PI*2);
+  ctx.fillStyle = '#ffe066'; ctx.fill();
+  if (highlighted) {
+    ctx.strokeStyle = '#f59e42'; ctx.lineWidth = 2.5*state.scale; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0, r+7*state.scale, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(245,158,66,0.55)'; ctx.lineWidth = 2*state.scale;
+    ctx.setLineDash([5*state.scale, 4*state.scale]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const fs = Math.max(12, 13*state.scale);
+  ctx.font = `bold ${fs}px 'Segoe UI', sans-serif`;
+  ctx.fillStyle = '#ffe066';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('object', 0, -(r+6*state.scale));
+  ctx.restore();
+}
+
+function drawAxis() {
+  const [x0,y0] = w2s(-9999,0), [x1,y1] = w2s(9999,0);
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1);
+  ctx.strokeStyle = 'rgba(100,120,160,0.3)';
+  ctx.lineWidth = 1*devicePixelRatio;
+  ctx.setLineDash([6*devicePixelRatio, 6*devicePixelRatio]);
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawGrid() {
+  const step = 50*state.scale;
+  if (step < 8) return;
+  const [ox,oy] = w2s(0,0);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)'; ctx.lineWidth = 1;
+  for (let sx = ox%step; sx < W; sx += step) { ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,H); ctx.stroke(); }
+  for (let sy = oy%step; sy < H; sy += step) { ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(W,sy); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawArrowHead(x1,y1, x2,y2, col) {
+  const mx=(x1+x2)/2, my=(y1+y2)/2;
+  const angle = Math.atan2(y2-y1, x2-x1);
+  const size = 9*state.scale;
+  ctx.save();
+  ctx.translate(mx,my); ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(size,0); ctx.lineTo(-size,size*0.5); ctx.lineTo(-size,-size*0.5);
+  ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  ctx.restore();
+}
+
+function getThetaLabelScreenPos() {
+  const { object, thetaOffset } = state;
+  return w2s(object.x + thetaOffset.x, object.y + thetaOffset.y);
+}
+
+function hitTestTheta(sx, sy) {
+  const [lx,ly] = getThetaLabelScreenPos();
+  const pad = 28*state.scale;
+  return Math.abs(sx-lx) < pad && Math.abs(sy-ly) < pad;
+}
+
+function drawCone(ex, ey, ox, oy) {
+  const edges = getPupilEdges(ex, ey);
+  const ovalCx = ex + OVAL_OFFSET_X;
+  const ovalCy = ey;
+
+  const end0 = rayEndpoint(ox, oy, edges[0].x, edges[0].y, ovalCx, ovalCy);
+  const end1 = rayEndpoint(ox, oy, edges[1].x, edges[1].y, ovalCx, ovalCy);
+
+  const [s0x,s0y] = w2s(ox, oy);
+  const [s1x,s1y] = w2s(end0.x, end0.y);
+  const [s2x,s2y] = w2s(end1.x, end1.y);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(s0x,s0y); ctx.lineTo(s1x,s1y); ctx.lineTo(s2x,s2y);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,224,102,0.08)'; ctx.fill();
+
+  ctx.strokeStyle = '#ffe066';
+  ctx.lineWidth = 2.2*state.scale;
+  ctx.shadowColor = 'rgba(255,224,102,0.5)'; ctx.shadowBlur = 7;
+  ctx.beginPath(); ctx.moveTo(s0x,s0y); ctx.lineTo(s1x,s1y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s0x,s0y); ctx.lineTo(s2x,s2y); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  drawArrowHead(s0x,s0y, s1x,s1y, '#ffe066');
+  drawArrowHead(s0x,s0y, s2x,s2y, '#ffe066');
+  ctx.restore();
+}
+
+function drawThetaLabel(ex, ey, ox, oy, isDragging) {
+  const ang = coneAngle(ex, ey, ox, oy);
+  const [lx,ly] = getThetaLabelScreenPos();
+  const [s0x,s0y] = w2s(ox, oy);
+
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(s0x,s0y); ctx.lineTo(lx,ly);
+  ctx.strokeStyle = 'rgba(255,208,64,0.3)';
+  ctx.lineWidth = 1*devicePixelRatio;
+  ctx.setLineDash([4*devicePixelRatio, 4*devicePixelRatio]);
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+
+  const fs = Math.max(13, LABEL_FS*state.scale);
+  const text = `θ = ${ang.toFixed(1)}°`;
+
+  ctx.save();
+  ctx.font = `bold ${fs}px 'Segoe UI', sans-serif`;
+  const tw = ctx.measureText(text).width;
+  const pad = 8*state.scale;
+  const bw = tw + pad*2, bh = fs + pad*1.2;
+
+  if (isDragging) { ctx.shadowColor = 'rgba(255,208,64,0.6)'; ctx.shadowBlur = 14; }
+  ctx.beginPath();
+  ctx.roundRect(lx-bw/2, ly-bh/2, bw, bh, 6*state.scale);
+  ctx.fillStyle = isDragging ? 'rgba(40,36,10,0.92)' : 'rgba(20,18,6,0.75)';
+  ctx.fill();
+  ctx.strokeStyle = isDragging ? '#f59e42' : 'rgba(255,208,64,0.55)';
+  ctx.lineWidth = isDragging ? 1.8*state.scale : 1.2*state.scale;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.fillStyle = '#ffd040';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, lx, ly);
+
+  if (!isDragging) {
+    ctx.beginPath();
+    ctx.arc(lx+bw/2-6*state.scale, ly-bh/2+5*state.scale, 2.5*state.scale, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,208,64,0.5)'; ctx.fill();
+  }
+  ctx.restore();
+}
+
+let dragTarget = null;
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  drawGrid(); drawAxis();
+  const { eye, object } = state;
+  drawCone(eye.x, eye.y, object.x, object.y);
+  drawThetaLabel(eye.x, eye.y, object.x, object.y, dragTarget === 'theta');
+  drawEyeSymbol(eye.x, eye.y, dragTarget === 'eye');
+  drawObject(object.x, object.y, dragTarget === 'object');
+}
+
+let lastPointer = null;
+const SNAP_Y = 20;
+
+function hitTest(sx, sy) {
+  if (hitTestTheta(sx,sy)) return 'theta';
+  const [ox,oy] = w2s(state.object.x, state.object.y);
+  if (Math.hypot(sx-ox,sy-oy) < 20*state.scale) return 'object';
+  const [cx,cy] = w2s(state.eye.x, state.eye.y);
+  const sc = state.scale;
+  const halfW = (OVAL_OFFSET_X+EYE_OVAL_RX+5)*sc;
+  const halfH = (CURVE_SPREAD_Y+10)*sc;
+  if (sx >= cx-10*sc && sx <= cx+halfW && Math.abs(sy-cy) <= halfH) return 'eye';
+  return 'pan';
+}
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return [(e.clientX-r.left)*devicePixelRatio, (e.clientY-r.top)*devicePixelRatio];
+}
+
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault(); canvas.setPointerCapture(e.pointerId);
+  const [sx,sy] = getPos(e);
+  dragTarget = hitTest(sx,sy);
+  lastPointer = {x:sx, y:sy};
+  canvas.style.cursor = dragTarget==='pan' ? 'grab' : 'move';
+});
+
+canvas.addEventListener('pointermove', e => {
+  e.preventDefault();
+  if (!dragTarget || !lastPointer) return;
+  const [sx,sy] = getPos(e);
+  const dx=sx-lastPointer.x, dy=sy-lastPointer.y;
+  lastPointer={x:sx,y:sy};
+  if (dragTarget==='pan') { state.panX+=dx; state.panY+=dy; }
+  else if (dragTarget==='theta') {
+    state.thetaOffset.x += dx/state.scale;
+    state.thetaOffset.y -= dy/state.scale;
+  } else {
+    const [wx,wy]=s2w(sx,sy);
+    state[dragTarget].x=wx;
+    state[dragTarget].y=Math.abs(wy)<SNAP_Y?0:wy;
+  }
+  draw();
+});
+
+canvas.addEventListener('pointerup',     () => { dragTarget=null; lastPointer=null; canvas.style.cursor='default'; });
+canvas.addEventListener('pointercancel', () => { dragTarget=null; lastPointer=null; canvas.style.cursor='default'; });
+
+let activeTouches={}, lastPinchDist=null;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) activeTouches[t.identifier]={x:t.clientX,y:t.clientY};
+},{passive:false});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length===2) {
+    const t0=e.touches[0],t1=e.touches[1];
+    const dist=Math.hypot(t0.clientX-t1.clientX,t0.clientY-t1.clientY);
+    const midX=((t0.clientX+t1.clientX)/2)*devicePixelRatio;
+    const midY=((t0.clientY+t1.clientY)/2)*devicePixelRatio;
+    if (lastPinchDist!==null) {
+      const ratio=dist/lastPinchDist;
+      const [wx,wy]=s2w(midX,midY);
+      state.scale=Math.min(Math.max(state.scale*ratio,0.2),6);
+      const [nsx,nsy]=w2s(wx,wy);
+      state.panX+=midX-nsx; state.panY+=midY-nsy;
+    }
+    lastPinchDist=dist;
+  }
+  for (const t of e.changedTouches) activeTouches[t.identifier]={x:t.clientX,y:t.clientY};
+  draw();
+},{passive:false});
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) delete activeTouches[t.identifier];
+  if (e.touches.length<2) lastPinchDist=null;
+},{passive:false});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const [sx,sy]=getPos(e);
+  const [wx,wy]=s2w(sx,sy);
+  const f=e.deltaY<0?1.1:1/1.1;
+  state.scale=Math.min(Math.max(state.scale*f,0.2),6);
+  const [nsx,nsy]=w2s(wx,wy);
+  state.panX+=sx-nsx; state.panY+=sy-nsy;
+  draw();
+},{passive:false});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragTarget) return;
+  const [sx,sy]=getPos(e);
+  canvas.style.cursor=hitTestTheta(sx,sy)?'move':'default';
+});
+
+resize();
+</script>
+</body>
+</html>
