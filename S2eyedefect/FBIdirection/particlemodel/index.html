@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Theory – States of Matter Simulation</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 10px;
+  }
+  h1 {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+    color: #a8dadc;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+  #main {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    max-width: 980px;
+    align-items: flex-start;
+  }
+  .panel {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .panel-title {
+    font-size: 0.82rem;
+    color: #a8dadc;
+    margin-bottom: 6px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  canvas { border-radius: 8px; display: block; }
+  #macroCanvas { background: #0f3460; }
+  #microCanvas { background: #0f3460; }
+
+  /* Right column: micro + thermometer + controls stacked */
+  #rightCol {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+  #microRow {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  /* Thermometer */
+  #thermoWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 44px;
+  }
+  #thermoLabel { font-size: 0.72rem; color: #a8dadc; }
+  #thermoCanvas { border-radius: 4px; }
+
+  /* Controls */
+  #controls {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.82rem;
+  }
+  .ctrl-row label { min-width: 110px; color: #ccc; }
+  input[type=range] {
+    flex: 1;
+    accent-color: #e94560;
+    cursor: pointer;
+  }
+  #stateLabel {
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+    color: #ffd166;
+    letter-spacing: 1px;
+    padding: 4px 0 2px;
+  }
+  #tempReadout {
+    text-align: right;
+    font-size: 0.82rem;
+    color: #ccc;
+    min-width: 52px;
+  }
+  #btnReset {
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 18px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    align-self: flex-end;
+  }
+  #btnReset:hover { background: #c73652; }
+  #phaseNote {
+    font-size: 0.78rem;
+    color: #a8dadc;
+    text-align: center;
+    min-height: 18px;
+  }
+</style>
+</head>
+<body>
+<h1>🔬 Particle Theory – Three States of Matter</h1>
+
+<div id="main">
+  <!-- LEFT: Macroscopic -->
+  <div class="panel">
+    <div class="panel-title">Macroscopic View</div>
+    <canvas id="macroCanvas" width="320" height="360"></canvas>
+  </div>
+
+  <!-- RIGHT -->
+  <div id="rightCol">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <!-- Micro panel -->
+      <div class="panel" style="flex:1;">
+        <div class="panel-title">Microscopic View (Particles)</div>
+        <canvas id="microCanvas" width="280" height="320"></canvas>
+      </div>
+      <!-- Thermometer -->
+      <div id="thermoWrap">
+        <div id="thermoLabel">Temp</div>
+        <canvas id="thermoCanvas" width="36" height="320"></canvas>
+        <div id="tempReadout">0 °U</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+      <div id="stateLabel">SOLID</div>
+      <div id="phaseNote">Particles vibrate in fixed positions</div>
+      <div class="ctrl-row">
+        <label>🔥 Heating Rate</label>
+        <input type="range" id="heatSlider" min="0" max="100" value="0">
+        <span id="heatVal">0%</span>
+      </div>
+      <button id="btnReset">↺ Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constants ──────────────────────────────────────────────────────────────
+const MELT_START  = 200;
+const MELT_END    = 230;
+const BOIL_START  = 500;
+const BOIL_END    = 530;
+const MAX_TEMP    = 800;
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let temperature = 0;
+let heatRate    = 0;
+
+// ─── Canvas refs ─────────────────────────────────────────────────────────────
+const macroC  = document.getElementById('macroCanvas');
+const microC  = document.getElementById('microCanvas');
+const thermoC = document.getElementById('thermoCanvas');
+const mCtx    = macroC.getContext('2d');
+const pCtx    = microC.getContext('2d');
+const tCtx    = thermoC.getContext('2d');
+
+// ─── Particles ───────────────────────────────────────────────────────────────
+const NUM_PARTICLES = 48;
+const PARTICLE_R    = 7;
+const MW = microC.width;
+const MH = microC.height;
+
+// Grid layout for solid
+const COLS = 8;
+const ROWS = 6;
+const GRID_X0 = 24, GRID_Y0 = 28;
+const GAP_X = (MW - GRID_X0*2) / (COLS - 1);
+const GAP_Y = (MH - GRID_Y0*2) / (ROWS - 1);
+
+// Each particle: { x, y, homeX, homeY, vx, vy, phase }
+let particles = [];
+
+function initParticles() {
+  particles = [];
+  let idx = 0;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const hx = GRID_X0 + c * GAP_X;
+      const hy = GRID_Y0 + r * GAP_Y;
+      particles.push({
+        x: hx, y: hy,
+        homeX: hx, homeY: hy,
+        vx: (Math.random()-0.5)*0.3,
+        vy: (Math.random()-0.5)*0.3,
+        // offset for independent vibration phase
+        phase: Math.random() * Math.PI * 2
+      });
+      idx++;
+    }
+  }
+}
+initParticles();
+
+// ─── Helper: current state string ────────────────────────────────────────────
+function getState() {
+  if (temperature < MELT_START)  return 'solid';
+  if (temperature < MELT_END)    return 'melting';
+  if (temperature < BOIL_START)  return 'liquid';
+  if (temperature < BOIL_END)    return 'boiling';
+  return 'gas';
+}
+
+// ─── Update Particles ────────────────────────────────────────────────────────
+let lastTime = 0;
+function updateParticles(dt) {
+  const state = getState();
+  const t = temperature;
+
+  particles.forEach((p, i) => {
+    if (state === 'solid') {
+      // Vibrate around home
+      const speed = 0.4 + (t / MELT_START) * 2.8;
+      p.phase += dt * (2 + Math.random()*0.4);
+      const amp = 1.5 + (t / MELT_START) * 3.5;
+      p.x = p.homeX + Math.sin(p.phase) * amp + (Math.random()-0.5)*0.4;
+      p.y = p.homeY + Math.cos(p.phase*1.3) * amp + (Math.random()-0.5)*0.4;
+
+    } else if (state === 'melting') {
+      // Gradually move apart from grid, drift speed stays constant
+      const prog = (t - MELT_START) / (MELT_END - MELT_START); // 0→1
+      // Push home positions outward from center
+      const cx = MW/2, cy = MH/2;
+      const dx = p.homeX - cx, dy = p.homeY - cy;
+      const spread = 1 + prog * 0.35;
+      const targetX = cx + dx * spread;
+      const targetY = cy + dy * spread;
+      // Still vibrate but loosely
+      const amp = 2 + prog*4;
+      p.phase += dt * 2.5;
+      p.x += (targetX - p.x) * 0.04 + Math.sin(p.phase)*amp*0.15;
+      p.y += (targetY - p.y) * 0.04 + Math.cos(p.phase*1.2)*amp*0.15;
+      // Small random drift
+      p.vx += (Math.random()-0.5)*0.05;
+      p.vy += (Math.random()-0.5)*0.05;
+      p.vx *= 0.98; p.vy *= 0.98;
+      p.x += p.vx*0.4; p.y += p.vy*0.4;
+
+    } else if (state === 'liquid') {
+      // Random walk, contained, speed scales with temp
+      const speed = 0.8 + ((t - MELT_END) / (BOIL_START - MELT_END)) * 2.5;
+      p.vx += (Math.random()-0.5) * speed * 0.35;
+      p.vy += (Math.random()-0.5) * speed * 0.35;
+      // Soft boundary
+      const pad = PARTICLE_R + 4;
+      if (p.x < pad)    { p.vx += 0.6; }
+      if (p.x > MW-pad) { p.vx -= 0.6; }
+      if (p.y < pad)    { p.vy += 0.6; }
+      if (p.y > MH-pad) { p.vy -= 0.6; }
+      // Damping
+      const damp = 0.92 - speed*0.008;
+      p.vx *= Math.max(0.88, damp);
+      p.vy *= Math.max(0.88, damp);
+      p.x += p.vx; p.y += p.vy;
+
+    } else if (state === 'boiling') {
+      // Particles start escaping upward and spreading
+      const prog = (t - BOIL_START) / (BOIL_END - BOIL_START);
+      const speed = 1.5 + prog * 3;
+      p.vx += (Math.random()-0.5) * speed * 0.4;
+      p.vy += (Math.random()-0.5) * speed * 0.4 - prog*0.08;
+      const pad = PARTICLE_R + 2;
+      if (p.x < pad)    { p.vx += 1.2; }
+      if (p.x > MW-pad) { p.vx -= 1.2; }
+      if (p.y < pad)    { p.vy += 1.2; }
+      if (p.y > MH-pad) { p.vy -= 1.2; }
+      p.vx *= 0.90; p.vy *= 0.90;
+      p.x += p.vx; p.y += p.vy;
+
+    } else { // gas
+      // Fast free movement
+      const speed = 2.5 + ((t - BOIL_END) / (MAX_TEMP - BOIL_END)) * 4;
+      p.vx += (Math.random()-0.5) * 0.5;
+      p.vy += (Math.random()-0.5) * 0.5;
+      const mag = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+      if (mag > speed) { p.vx = p.vx/mag*speed; p.vy = p.vy/mag*speed; }
+      const pad = PARTICLE_R + 2;
+      if (p.x < pad)    { p.vx = Math.abs(p.vx); }
+      if (p.x > MW-pad) { p.vx = -Math.abs(p.vx); }
+      if (p.y < pad)    { p.vy = Math.abs(p.vy); }
+      if (p.y > MH-pad) { p.vy = -Math.abs(p.vy); }
+      p.x += p.vx; p.y += p.vy;
+    }
+
+    // Clamp
+    p.x = Math.max(PARTICLE_R, Math.min(MW - PARTICLE_R, p.x));
+    p.y = Math.max(PARTICLE_R, Math.min(MH - PARTICLE_R, p.y));
+  });
+}
+
+// ─── Draw Micro ───────────────────────────────────────────────────────────────
+function drawMicro() {
+  const state = getState();
+  pCtx.clearRect(0, 0, MW, MH);
+
+  // Background
+  pCtx.fillStyle = '#0a1628';
+  pCtx.fillRect(0, 0, MW, MH);
+
+  // Box
+  pCtx.strokeStyle = '#3a7bd5';
+  pCtx.lineWidth = 2;
+  pCtx.strokeRect(1, 1, MW-2, MH-2);
+
+  // Particle color by state
+  const colors = {
+    solid:   ['#74b9ff','#0984e3'],
+    melting: ['#81ecec','#00b894'],
+    liquid:  ['#55efc4','#00cec9'],
+    boiling: ['#ffeaa7','#fdcb6e'],
+    gas:     ['#fab1a0','#e17055']
+  };
+  const [c1, c2] = colors[state] || colors.gas;
+
+  particles.forEach(p => {
+    const grad = pCtx.createRadialGradient(p.x-2, p.y-2, 1, p.x, p.y, PARTICLE_R);
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(0.3, c1);
+    grad.addColorStop(1, c2);
+    pCtx.beginPath();
+    pCtx.arc(p.x, p.y, PARTICLE_R, 0, Math.PI*2);
+    pCtx.fillStyle = grad;
+    pCtx.fill();
+  });
+
+  // Bond lines for solid/melting
+  if (state === 'solid' || state === 'melting') {
+    const prog = state === 'solid' ? 1 : 1 - (temperature - MELT_START)/(MELT_END - MELT_START);
+    pCtx.strokeStyle = `rgba(116,185,255,${prog * 0.35})`;
+    pCtx.lineWidth = 1;
+    particles.forEach((p, i) => {
+      particles.forEach((q, j) => {
+        if (j <= i) return;
+        const dx = p.x - q.x, dy = p.y - q.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < GAP_X * 1.5) {
+          pCtx.beginPath();
+          pCtx.moveTo(p.x, p.y);
+          pCtx.lineTo(q.x, q.y);
+          pCtx.stroke();
+        }
+      });
+    });
+  }
+}
+
+// ─── Draw Macro ───────────────────────────────────────────────────────────────
+const MW2 = macroC.width;
+const MH2 = macroC.height;
+let meltAnim = 0; // 0→1 drip progress
+let boilAnim = 0; // 0→1 bubble/steam
+
+function drawMacro() {
+  const state = getState();
+  mCtx.clearRect(0, 0, MW2, MH2);
+
+  // Background
+  mCtx.fillStyle = '#0a1628';
+  mCtx.fillRect(0, 0, MW2, MH2);
+
+  // Container box outline
+  mCtx.strokeStyle = '#3a7bd5';
+  mCtx.lineWidth = 3;
+  mCtx.strokeRect(4, 4, MW2-8, MH2-8);
+
+  const cx = MW2/2;
+  const t = temperature;
+
+  if (state === 'solid') {
+    // Solid block
+    const w = 180, h = 130;
+    const x0 = cx - w/2, y0 = MH2 - 50 - h;
+    // Slight color temp shift
+    const r = Math.floor(60 + (t/MELT_START)*60);
+    const b = Math.floor(220 - (t/MELT_START)*80);
+    mCtx.fillStyle = `rgb(${r},140,${b})`;
+    // Rounded block
+    roundRect(mCtx, x0, y0, w, h, 10);
+    mCtx.fill();
+    // Sheen
+    mCtx.fillStyle = 'rgba(255,255,255,0.1)';
+    roundRect(mCtx, x0+6, y0+6, w-12, 28, 6);
+    mCtx.fill();
+    // Label
+    mCtx.fillStyle = 'rgba(255,255,255,0.7)';
+    mCtx.font = 'bold 15px Segoe UI';
+    mCtx.textAlign = 'center';
+    mCtx.fillText('SOLID', cx, y0 + h/2 + 6);
+    // Floor
+    drawFloor();
+
+  } else if (state === 'melting') {
+    const prog = (t - MELT_START)/(MELT_END - MELT_START);
+    meltAnim = prog;
+    // Shrinking solid block
+    const w = 180*(1-prog*0.3), h = 130*(1-prog*0.35);
+    const x0 = cx - w/2, y0 = MH2 - 50 - h - prog*10;
+    mCtx.fillStyle = `rgb(120, 200, 180)`;
+    roundRect(mCtx, x0, y0, w, h, 10);
+    mCtx.fill();
+    // Melt puddle spreading
+    const puddleW = 180 + prog*80;
+    const puddleH = 18 + prog*22;
+    mCtx.fillStyle = `rgba(80,220,200,${0.5+prog*0.4})`;
+    mCtx.beginPath();
+    mCtx.ellipse(cx, MH2-50, puddleW/2, puddleH/2, 0, 0, Math.PI*2);
+    mCtx.fill();
+    // Drips
+    for (let d = 0; d < 4; d++) {
+      const dx = cx - 60 + d*40;
+      const dripY = y0 + h + prog*(50+d*8);
+      mCtx.fillStyle = `rgba(80,220,200,0.7)`;
+      mCtx.beginPath();
+      mCtx.arc(dx, dripY, 5+prog*3, 0, Math.PI*2);
+      mCtx.fill();
+    }
+    mCtx.fillStyle = 'rgba(255,255,255,0.6)';
+    mCtx.font = 'bold 13px Segoe UI';
+    mCtx.textAlign = 'center';
+    mCtx.fillText('MELTING...', cx, MH2-80);
+    drawFloor();
+
+  } else if (state === 'liquid') {
+    // Liquid level
+    const fillFrac = 0.35 + ((t-MELT_END)/(BOIL_START-MELT_END))*0.12;
+    const fillH = MH2 * fillFrac;
+    const yLiq = MH2 - 50 - fillH;
+    // Animated wave
+    const waveOff = (Date.now()/600) % (Math.PI*2);
+    mCtx.fillStyle = 'rgba(0,206,201,0.8)';
+    mCtx.beginPath();
+    mCtx.moveTo(6, yLiq);
+    for (let x = 6; x <= MW2-14; x+=4) {
+      const wave = Math.sin((x/30) + waveOff)*5 * (1 + (t-MELT_END)/400);
+      mCtx.lineTo(x, yLiq + wave);
+    }
+    mCtx.lineTo(MW2-6, MH2-50);
+    mCtx.lineTo(6, MH2-50);
+    mCtx.closePath();
+    mCtx.fill();
+    // Shimmer
+    mCtx.fillStyle = 'rgba(255,255,255,0.08)';
+    mCtx.fillRect(6, yLiq+10, MW2-18, 8);
+    mCtx.fillStyle = 'rgba(255,255,255,0.7)';
+    mCtx.font = 'bold 15px Segoe UI';
+    mCtx.textAlign = 'center';
+    mCtx.fillText('LIQUID', cx, yLiq + fillH/2 + 6);
+    drawFloor();
+
+  } else if (state === 'boiling') {
+    const prog = (t - BOIL_START)/(BOIL_END - BOIL_START);
+    // Liquid with bubbles
+    const fillH = MH2 * 0.47;
+    const yLiq = MH2 - 50 - fillH;
+    const waveOff = (Date.now()/300) % (Math.PI*2);
+    mCtx.fillStyle = 'rgba(0,180,170,0.85)';
+    mCtx.beginPath();
+    mCtx.moveTo(6, yLiq);
+    for (let x = 6; x <= MW2-14; x+=4) {
+      const wave = Math.sin((x/20) + waveOff) * (8 + prog*14);
+      mCtx.lineTo(x, yLiq + wave);
+    }
+    mCtx.lineTo(MW2-6, MH2-50);
+    mCtx.lineTo(6, MH2-50);
+    mCtx.closePath();
+    mCtx.fill();
+    // Rising bubbles
+    const now = Date.now()/1000;
+    for (let b = 0; b < 8; b++) {
+      const bx = 40 + (b*33 + Math.sin(now*0.7+b)*18) % (MW2-80);
+      const by = MH2 - 50 - ((now*60*(0.5+b*0.15) + b*80) % (fillH-20));
+      const br = 5 + prog*6;
+      mCtx.strokeStyle = 'rgba(200,255,255,0.7)';
+      mCtx.lineWidth = 1.5;
+      mCtx.beginPath();
+      mCtx.arc(bx, by, br, 0, Math.PI*2);
+      mCtx.stroke();
+    }
+    // Steam wisps above liquid
+    for (let s = 0; s < 5; s++) {
+      const sx = 50 + s*50 + Math.sin(now*1.2+s)*15;
+      const sy = yLiq - 30 - prog*60 - s*10;
+      const alpha = prog * (0.6 - s*0.08);
+      mCtx.fillStyle = `rgba(200,240,240,${Math.max(0,alpha)})`;
+      mCtx.beginPath();
+      mCtx.ellipse(sx, sy, 12+s*3, 8+prog*12, 0, 0, Math.PI*2);
+      mCtx.fill();
+    }
+    mCtx.fillStyle = 'rgba(255,255,255,0.7)';
+    mCtx.font = 'bold 13px Segoe UI';
+    mCtx.textAlign = 'center';
+    mCtx.fillText('BOILING...', cx, MH2/2);
+    drawFloor();
+
+  } else { // gas
+    // Fill container with gas
+    const gasT = (t - BOIL_END)/(MAX_TEMP - BOIL_END); // 0→1
+    mCtx.fillStyle = `rgba(253,203,110,${0.08 + gasT*0.22})`;
+    mCtx.fillRect(6, 6, MW2-12, MH2-12);
+    // Gas molecules floating (drawn as small blobs)
+    const now = Date.now()/1000;
+    for (let g = 0; g < 20; g++) {
+      const gx = 20 + ((g*57 + Math.sin(now*(0.6+g*0.05)+g)*60 + now*20*(0.5+g*0.05)*30) % (MW2-40));
+      const gy = 20 + ((g*43 + Math.cos(now*(0.5+g*0.04)+g*2)*50 + now*18*(0.4+g*0.04)*30) % (MH2-70));
+      mCtx.fillStyle = `rgba(250,177,160,${0.4+gasT*0.4})`;
+      mCtx.beginPath();
+      mCtx.arc(gx, gy, 6+gasT*4, 0, Math.PI*2);
+      mCtx.fill();
+    }
+    // Steam / pressure lines
+    for (let l = 0; l < 6; l++) {
+      const lx = 30 + l*45;
+      mCtx.strokeStyle = `rgba(255,200,100,${0.15+gasT*0.2})`;
+      mCtx.lineWidth = 1;
+      mCtx.beginPath();
+      mCtx.moveTo(lx, MH2-30);
+      mCtx.bezierCurveTo(lx+10, MH2-80, lx-10, MH2-130, lx+5, MH2-170);
+      mCtx.stroke();
+    }
+    mCtx.fillStyle = 'rgba(255,255,255,0.75)';
+    mCtx.font = 'bold 15px Segoe UI';
+    mCtx.textAlign = 'center';
+    mCtx.fillText('GAS', cx, MH2/2+6);
+  }
+}
+
+function drawFloor() {
+  mCtx.fillStyle = '#1e3a5f';
+  mCtx.fillRect(6, MH2-50, MW2-12, 44);
+  mCtx.strokeStyle = '#3a7bd5';
+  mCtx.lineWidth = 1;
+  mCtx.strokeRect(6, MH2-50, MW2-12, 44);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+// ─── Draw Thermometer ─────────────────────────────────────────────────────────
+function drawThermo() {
+  const W = thermoC.width, H = thermoC.height;
+  tCtx.clearRect(0,0,W,H);
+  tCtx.fillStyle = '#0a1628';
+  tCtx.fillRect(0,0,W,H);
+
+  const barX = W/2 - 7, barW = 14;
+  const barTop = 14, barH = H - 60;
+
+  // Background track
+  tCtx.fillStyle = '#1e3a5f';
+  tCtx.beginPath();
+  tCtx.roundRect(barX, barTop, barW, barH, 7);
+  tCtx.fill();
+
+  // Temperature fill
+  const frac = temperature / MAX_TEMP;
+  const fillH = barH * frac;
+  const r = Math.floor(50 + frac*200);
+  const g = Math.floor(100 - frac*80);
+  const b = Math.floor(220 - frac*200);
+  tCtx.fillStyle = `rgb(${r},${g},${b})`;
+  tCtx.beginPath();
+  tCtx.roundRect(barX, barTop + barH - fillH, barW, fillH, 4);
+  tCtx.fill();
+
+  // Phase markers
+  const markers = [
+    { t: MELT_START, label: 'MP', color: '#74b9ff' },
+    { t: BOIL_START, label: 'BP', color: '#fdcb6e' }
+  ];
+  markers.forEach(m => {
+    const y = barTop + barH - barH*(m.t/MAX_TEMP);
+    tCtx.strokeStyle = m.color;
+    tCtx.lineWidth = 1.5;
+    tCtx.setLineDash([2,2]);
+    tCtx.beginPath();
+    tCtx.moveTo(barX-4, y);
+    tCtx.lineTo(barX+barW+4, y);
+    tCtx.stroke();
+    tCtx.setLineDash([]);
+  });
+
+  // Bulb
+  tCtx.fillStyle = `rgb(${r},${g},${b})`;
+  tCtx.beginPath();
+  tCtx.arc(W/2, barTop+barH+14, 12, 0, Math.PI*2);
+  tCtx.fill();
+  tCtx.strokeStyle = '#3a7bd5';
+  tCtx.lineWidth = 1.5;
+  tCtx.stroke();
+
+  // Tick marks
+  tCtx.fillStyle = '#4a90d9';
+  tCtx.font = '8px Segoe UI';
+  tCtx.textAlign = 'right';
+  [0,200,500,800].forEach(tv => {
+    const y = barTop + barH - barH*(tv/MAX_TEMP);
+    tCtx.fillText(tv, barX-2, y+3);
+  });
+}
+
+// ─── UI Updates ───────────────────────────────────────────────────────────────
+const stateMessages = {
+  solid:   'Particles vibrate in fixed positions',
+  melting: '⚠️ Phase change: Particles moving apart (temp constant)',
+  liquid:  'Particles flow freely, close together',
+  boiling: '⚠️ Phase change: Particles escaping to gas',
+  gas:     'Particles move rapidly, far apart, fill container'
+};
+const stateNames = {
+  solid:'SOLID', melting:'MELTING', liquid:'LIQUID', boiling:'BOILING', gas:'GAS'
+};
+const stateColors = {
+  solid:'#74b9ff', melting:'#81ecec', liquid:'#55efc4', boiling:'#ffd166', gas:'#fab1a0'
+};
+
+let lastState = '';
+function updateUI() {
+  const state = getState();
+  document.getElementById('tempReadout').textContent = Math.round(temperature) + ' °U';
+  if (state !== lastState) {
+    lastState = state;
+    const sl = document.getElementById('stateLabel');
+    sl.textContent = stateNames[state];
+    sl.style.color = stateColors[state];
+    document.getElementById('phaseNote').textContent = stateMessages[state];
+  }
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+const heatSlider = document.getElementById('heatSlider');
+heatSlider.addEventListener('input', () => {
+  heatRate = parseFloat(heatSlider.value);
+  document.getElementById('heatVal').textContent = Math.round(heatRate) + '%';
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  temperature = 0;
+  heatRate = 0;
+  heatSlider.value = 0;
+  document.getElementById('heatVal').textContent = '0%';
+  initParticles();
+  lastState = '';
+  updateUI();
+});
+
+// ─── Main Loop ────────────────────────────────────────────────────────────────
+let prevTime = null;
+function loop(ts) {
+  const dt = prevTime ? Math.min((ts - prevTime)/16.67, 3) : 1;
+  prevTime = ts;
+
+  // Temperature update
+  const state = getState();
+  // During phase changes (melting/boiling), temperature stays flat
+  if (state !== 'melting' && state !== 'boiling') {
+    temperature += heatRate * 0.018 * dt;
+  } else {
+    // Slowly creep through phase change proportional to heat rate
+    temperature += heatRate * 0.004 * dt;
+  }
+  if (temperature > MAX_TEMP) temperature = MAX_TEMP;
+
+  updateParticles(dt);
+  drawMacro();
+  drawMicro();
+  drawThermo();
+  updateUI();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
